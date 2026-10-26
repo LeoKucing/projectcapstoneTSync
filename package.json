@@ -1,0 +1,24 @@
+{
+  "name": "tsync-prototype",
+  "version": "1.0.0",
+  "description": "Tsync - Collaborative Task Management Application Prototype",
+  "scripts": {
+    "install:server": "cd server && npm install",
+    "install:client": "cd client && npm install",
+    "install:all": "npm run install:server && npm run install:client",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev"
+  },
+  "keywords": [
+    "task-management",
+    "tsync",
+    "react",
+    "tailwind",
+    "nodejs",
+    "express",
+    "postgresql",
+    "kanban"
+  ],
+  "author": "Tsync Team",
+  "license": "MIT"
+}
