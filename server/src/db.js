@@ -178,8 +178,9 @@ export async function initDatabase() {
   try {
     pool = new Pool({
       connectionString,
-      connectionTimeoutMillis: 2000,
-      idleTimeoutMillis: 5000
+      connectionTimeoutMillis: 3000,
+      idleTimeoutMillis: 5000,
+      ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
     });
 
     const client = await pool.connect();
@@ -198,10 +199,64 @@ export async function initDatabase() {
     if (!checkTable.rows[0].exists) {
       console.log('[Tsync DB] Initializing PostgreSQL schema & seed...');
       const schemaPath = path.resolve(__dirname, '../schema.sql');
+      let schemaSql = '';
       if (fs.existsSync(schemaPath)) {
-        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-        await client.query(schemaSql);
-        console.log('[Tsync DB] Schema applied successfully.');
+        schemaSql = fs.readFileSync(schemaPath, 'utf8');
+      } else {
+        // Fallback schema if running in bundle
+        schemaSql = `
+          CREATE TABLE IF NOT EXISTS members (
+            id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(150) UNIQUE NOT NULL,
+            avatar VARCHAR(255),
+            role VARCHAR(50) DEFAULT 'Member',
+            department VARCHAR(50) DEFAULT 'Engineering',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE TABLE IF NOT EXISTS projects (
+            id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            description TEXT,
+            color VARCHAR(30) DEFAULT '#6366f1',
+            icon VARCHAR(30) DEFAULT 'FolderKanban',
+            status VARCHAR(30) DEFAULT 'active',
+            due_date DATE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE TABLE IF NOT EXISTS tasks (
+            id VARCHAR(50) PRIMARY KEY,
+            project_id VARCHAR(50) REFERENCES projects(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            status VARCHAR(50) DEFAULT 'todo',
+            priority VARCHAR(50) DEFAULT 'medium',
+            due_date DATE,
+            assignee_id VARCHAR(50) REFERENCES members(id) ON DELETE SET NULL,
+            tags JSONB DEFAULT '[]'::jsonb,
+            position INT DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE TABLE IF NOT EXISTS subtasks (
+            id VARCHAR(50) PRIMARY KEY,
+            task_id VARCHAR(50) REFERENCES tasks(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            completed BOOLEAN DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE TABLE IF NOT EXISTS activities (
+            id VARCHAR(50) PRIMARY KEY,
+            task_id VARCHAR(50) REFERENCES tasks(id) ON DELETE CASCADE,
+            user_id VARCHAR(50) REFERENCES members(id) ON DELETE SET NULL,
+            action VARCHAR(255) NOT NULL,
+            details TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+        `;
+      }
+      await client.query(schemaSql);
+      console.log('[Tsync DB] Schema applied successfully.');
         
         // Seed initial data into PostgreSQL
         for (const m of initialMembers) {
@@ -226,7 +281,6 @@ export async function initDatabase() {
           );
         }
         console.log('[Tsync DB] Seed data inserted into PostgreSQL.');
-      }
     }
     client.release();
   } catch (err) {
