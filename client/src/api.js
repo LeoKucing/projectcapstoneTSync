@@ -1,6 +1,7 @@
 // Tsync REST API Client with resilient local caching
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const rawBase = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = rawBase.replace(/\/+$/, '');
 
 // Fallback seed data if offline on first load
 const FALLBACK_KEY = 'tsync_offline_data_v1';
